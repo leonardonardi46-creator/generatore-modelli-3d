@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#101114" />
-  <meta name="description" content="Generatore procedurale 3D con varianti riproducibili, parametri mesh ed esportazione locale." />
+  <meta name="description" content="Generatore procedurale 3D con prompt assistiti, varianti riproducibili, parametri mesh ed esportazione locale." />
   <title>Forma — Generatore 3D</title>
 </head>
 <body>
@@ -31,9 +31,7 @@
             <div class="variant-divider"></div><div class="variant-heading"><span>Varianti procedurali</span><span class="variant-badge">SEED</span></div><p class="setting-hint">Stessa descrizione e seed producono la stessa variante. Cambia seed o intensità per esplorare alternative.</p>
             <label class="setting-label setting-spaced" for="variation">Intensità variazione <output id="variation-value">20%</output></label><input id="variation" class="setting-range" type="range" min="0" max="100" step="1" value="20" />
             <label class="setting-label setting-spaced" for="seed">Seed riproducibile</label><div class="seed-row"><input id="seed" type="number" min="0" max="4294967295" step="1" value="42" /><button id="random-seed" class="seed-button" type="button" title="Crea un seed casuale">Nuovo seed ↻</button></div>
-            <div class="triangle-readout"><span>Triangoli effettivi</span><strong id="triangle-count">—</strong></div>
-            <button id="save-variant" class="save-variant-button" type="button">＋ Salva nei miei modelli</button>
-            <div id="saved-variants" class="saved-variants" aria-live="polite"></div>
+            <div class="triangle-readout"><span>Triangoli effettivi</span><strong id="triangle-count">—</strong></div><button id="save-variant" class="save-variant-button" type="button">＋ Salva nei miei modelli</button><div id="saved-variants" class="saved-variants" aria-live="polite"></div>
           </div></details>
           <button class="create-button" id="generate" type="button"><span class="button-sparkle" aria-hidden="true">✳</span> Genera modello <span class="button-arrow" aria-hidden="true">→</span></button><p class="privacy-note"><span aria-hidden="true">◇</span> Prompt e modelli restano sul dispositivo.</p>
         </aside>
@@ -42,11 +40,12 @@
           <div class="export-card"><div class="export-copy"><span class="step-label">03 — PORTA CON TE</span><h2>Esporta il modello</h2><p>GLB e STL includono la variante attualmente generata.</p></div><div class="export-actions"><button class="export-button" id="export-glb" type="button"><span class="file-icon">3D</span><span><strong>Scarica GLB</strong><small>Scene 3D · web e app</small></span><span class="download-arrow" aria-hidden="true">↓</span></button><button class="export-button" id="export-stl" type="button"><span class="file-icon stl-icon">STL</span><span><strong>Scarica STL</strong><small>Mesh · stampa 3D</small></span><span class="download-arrow" aria-hidden="true">↓</span></button></div></div>
         </section>
       </div>
-      <section class="how-it-works" id="come-funziona"><span class="step-label">PROCEDURALE, TRASPARENTE</span><p><strong>Varianti riproducibili, senza AI.</strong> Il seed guida variazioni controllate delle parti già presenti nel modello; le impostazioni si applicano anche agli export. Puoi salvare le combinazioni nel browser e riaprirle in seguito. Le possibilità di combinazione sono ampie ma restano vincolate a forme e regole definite nel codice: non crea automaticamente oggetti arbitrari né garantisce idoneità alla stampa 3D.</p></section>
+      <section class="how-it-works" id="come-funziona"><span class="step-label">PROCEDURALE, TRASPARENTE</span><p><strong>Varianti e suggerimenti locali, senza AI.</strong> Le descrizioni suggerite sono ricette esplicite per oggetti e parti supportati; puoi applicarle e modificarle. Non sono un interprete generale e non garantiscono la generazione di oggetti arbitrari.</p></section>
       <footer class="site-footer"><span>FORMA<span class="brand-dot">.</span> <span>© 2026</span></span><span>Progettato per creare, pronto da esplorare.</span></footer>
     </main>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </div>
+  <script type="module" src="/src/prompt-suggestions.js"></script>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>
