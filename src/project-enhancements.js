@@ -48,6 +48,57 @@ alternativeButton?.addEventListener('click', () => {
   generateButton?.click();
 });
 
+// Give the user a short, cancellable preparation countdown before synchronous local generation.
+// This avoids pretending that JavaScript can interrupt geometry generation midway through a frame.
+const status = $('#status-text');
+const loading = $('#loading');
+const previewFooter = status?.parentElement;
+const cancelButton = document.createElement('button');
+cancelButton.type = 'button';
+cancelButton.id = 'cancel-generation';
+cancelButton.textContent = 'Annulla';
+cancelButton.hidden = true;
+cancelButton.setAttribute('aria-label', 'Annulla la generazione del modello');
+previewFooter?.appendChild(cancelButton);
+let countdownTimer = null;
+let countdownEndsAt = 0;
+let generationQueued = false;
+function finishCountdown(cancelled) {
+  clearInterval(countdownTimer);
+  countdownTimer = null;
+  generationQueued = false;
+  cancelButton.hidden = true;
+  if (loading) loading.hidden = true;
+  if (status) status.textContent = cancelled ? 'Generazione annullata' : 'Modello pronto';
+}
+function startCountdown() {
+  if (generationQueued) return;
+  generationQueued = true;
+  countdownEndsAt = Date.now() + 3000;
+  cancelButton.hidden = false;
+  if (loading) loading.hidden = false;
+  const update = () => {
+    const remaining = Math.max(0, countdownEndsAt - Date.now());
+    const seconds = Math.ceil(remaining / 1000);
+    if (status) status.textContent = seconds ? `Generazione tra ${seconds}…` : 'Generazione modello…';
+    if (!remaining) {
+      finishCountdown(false);
+      generateButton.dataset.countdownComplete = 'true';
+      generateButton.click();
+      delete generateButton.dataset.countdownComplete;
+    }
+  };
+  update();
+  countdownTimer = setInterval(update, 100);
+}
+generateButton?.addEventListener('click', (event) => {
+  if (generateButton.dataset.countdownComplete === 'true') return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  startCountdown();
+}, true);
+cancelButton.addEventListener('click', () => finishCountdown(true));
+
 function updateProjectCount() {
   const count = projects?.querySelectorAll('.saved-variant-row').length || 0;
   const label = $('#projects-count');
@@ -61,8 +112,21 @@ if (projects) {
 const css = document.createElement('style');
 css.textContent = `
 .style-row{display:block;margin:14px 0}.style-row select{width:100%;margin-top:7px}
-.generation-actions{display:grid;gap:9px}.alternative-button{width:100%;padding:12px;border:1px solid #494451;border-radius:7px;background:#1a191f;color:#e8e4f0;font:600 13px 'DM Sans',sans-serif;cursor:pointer}.alternative-button:hover{border-color:#9b87f5;color:#fff}
+.generation-actions{display:grid;gap:10px}.alternative-button{width:100%;padding:12px;border:1px solid #494451;border-radius:7px;background:#1a191f;color:#e8e4f0;font:600 13px 'DM Sans',sans-serif;cursor:pointer}.alternative-button:hover{border-color:#9b87f5;color:#fff}
+#cancel-generation{margin-left:auto;padding:6px 12px;border:1px solid #ad5660;border-radius:6px;background:#2c191d;color:#ffdce0;font:600 12px 'DM Sans',sans-serif;cursor:pointer}#cancel-generation:hover{background:#442127}
 .projects-section{margin:34px 0;padding:24px;border:1px solid #302e36;border-radius:10px;background:#151519}.projects-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.projects-heading h2{margin:6px 0;font:700 22px 'Manrope',sans-serif}.projects-heading p{margin:0;color:#a6a2af;font-size:13px}.projects-count{color:#aaa3b8;font-size:12px}.projects-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px;margin-top:18px}.saved-variant-row{display:flex;gap:8px;align-items:stretch;padding:9px;border:1px solid #34313c;border-radius:7px;background:#19181e}.saved-load{flex:1;min-width:0;border:0;background:transparent;color:#e9e5ef;text-align:left;overflow-wrap:anywhere;cursor:pointer}.saved-remove{width:34px;border:1px solid #494451;border-radius:5px;background:#201e25;color:#d9d4e0;cursor:pointer}.saved-empty{grid-column:1/-1;color:#aaa3b8;font-size:13px}
-@media(max-width:600px){.projects-section{padding:17px}.projects-heading{display:block}.projects-count{display:inline-block;margin-top:12px}}
+/* Consistent, polished controls with clear hierarchy, focus and disabled states. */
+button{font-family:'DM Sans',sans-serif;font-weight:600;transition:background-color .18s ease,border-color .18s ease,color .18s ease,transform .18s ease,box-shadow .18s ease}
+button:not(:disabled){cursor:pointer}button:not(:disabled):active{transform:translateY(1px)}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid #a995ff;outline-offset:2px}
+.create-button,.export-actions button{border:1px solid #a996ff;border-radius:8px;background:linear-gradient(135deg,#9b87f5,#765fe0);color:#fff;box-shadow:0 5px 16px #8067ec30}
+.create-button:hover,.export-actions button:hover{background:linear-gradient(135deg,#ad9cff,#826df0);box-shadow:0 7px 20px #8067ec50;transform:translateY(-1px)}
+.alternative-button,#random-seed,#screenshot,.text-button{border:1px solid #45424d;border-radius:8px;background:#201f26;color:#ebe8f1}
+.alternative-button:hover,#random-seed:hover,#screenshot:hover,.text-button:hover{border-color:#8171ba;background:#292733;color:#fff}
+#save-variant,.save-variant-button{border:1px solid #4d806a;border-radius:8px;background:#1b2b25;color:#d3f0df}
+#save-variant:hover,.save-variant-button:hover{background:#234031;border-color:#65a782}
+.export-actions{display:flex;gap:10px}.export-actions button{padding:10px 15px}
+button:disabled{opacity:.52;cursor:not-allowed;box-shadow:none}
+@media(max-width:600px){.projects-section{padding:17px}.projects-heading{display:block}.projects-count{display:inline-block;margin-top:12px}.export-actions{flex-wrap:wrap}}
 `;
 document.head.appendChild(css);
