@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#101114" />
-  <meta name="description" content="Generatore procedurale 3D con libreria progetti, stili e varianti locali." />
+  <meta name="description" content="Generatore procedurale 3D con libreria progetti e varianti locali." />
   <title>Forma — Generatore 3D</title>
 </head>
 <body>
@@ -14,10 +14,10 @@
       <div class="topbar-right"><span class="local-badge"><i></i> Elaborazione locale</span><a class="top-link" href="#come-funziona">Come funziona ↗</a></div>
     </header>
     <main class="workspace">
-      <section class="intro" aria-labelledby="page-title"><div class="eyebrow"><span class="eyebrow-line"></span> LABORATORIO 3D</div><h1 id="page-title">Dai forma alle<br /><span>tue idee.</span></h1><p>Descrivi un oggetto, scegli lo stile e crea una variante 3D direttamente nel browser.</p></section>
+      <section class="intro" aria-labelledby="page-title"><div class="eyebrow"><span class="eyebrow-line"></span> LABORATORIO 3D</div><h1 id="page-title">Dai forma alle<br /><span>tue idee.</span></h1><p>Crea modelli 3D procedurali direttamente nel browser.</p></section>
       <div class="studio-grid">
         <aside class="panel controls-panel" aria-label="Impostazioni del modello">
-          <div class="panel-heading"><div><span class="step-label">01 — CONFIGURA</span><h2>Il tuo modello</h2></div><span class="heading-icon" aria-hidden="true">✳</span></div>
+          <div class="panel-heading"><div><span class="step-label">01 — CONFIGURA</span><h2>Il tuo modello</h2></div></div>
           <label class="field-label" for="prompt">Descrivi cosa vuoi creare</label><textarea id="prompt" rows="3" maxlength="240">Un cubo minimalista</textarea>
           <div class="field-row shape-row"><label class="field-label" for="shape">Libreria di forme</label><select id="shape" aria-label="Scegli una forma"><option value="auto">Rileva dal prompt</option></select></div>
           <div class="field-row dimensions-heading"><span class="field-label">Dimensioni <span class="unit">unità</span></span><button class="text-button" id="reset-dimensions" type="button">Ripristina</button></div>
@@ -28,24 +28,24 @@
           </div>
           <div class="field-row color-row"><label class="field-label" for="color">Colore</label><div class="color-control"><input id="color" type="color" value="#9b87f5" /><span id="color-value">Lavanda</span></div></div>
           <details class="advanced-options" open><summary>Parametri avanzati <span>opzionali</span></summary><div class="advanced-body">
-            <label class="setting-label" for="mesh-quality">Preset qualità</label><select id="mesh-quality"><option value="low">Bassa · anteprima rapida</option><option value="medium" selected>Media</option><option value="high">Alta</option><option value="custom">Personalizzata</option></select>
+            <label class="setting-label" for="mesh-quality">Preset qualità</label><select id="mesh-quality"><option value="low">Bozza · rapida</option><option value="medium" selected>Standard</option><option value="high">Alta</option><option value="custom">Personalizzata</option></select>
             <label class="setting-label setting-spaced" for="polygon-budget">Polycount massimo (triangoli) <output id="budget-value">8.000</output></label><input id="polygon-budget" type="range" min="500" max="50000" step="500" value="8000" />
             <label class="setting-label setting-spaced" for="surface-roughness">Rugosità superficie <output id="roughness-value">0.48</output></label><input id="surface-roughness" type="range" min="0.05" max="1" step="0.01" value="0.48" />
             <label class="toggle-setting"><input id="smooth-shading" type="checkbox" checked /><span>Ombreggiatura liscia</span></label><label class="toggle-setting"><input id="wireframe" type="checkbox" /><span>Wireframe</span></label>
-            <div class="variant-divider"></div><div class="variant-heading"><span>Varianti procedurali</span><span class="variant-badge">SEED</span></div><p class="setting-hint">Cambia seed per ottenere una variante diversa.</p>
-            <label class="setting-label setting-spaced" for="variation">Intensità variazione <output id="variation-value">20%</output></label><input id="variation" type="range" min="0" max="100" step="1" value="20" />
-            <label class="setting-label setting-spaced" for="seed">Seed riproducibile</label><div class="seed-row"><input id="seed" type="number" min="0" max="4294967295" step="1" value="42" /><button id="random-seed" type="button">⟳ Nuovo seed</button></div>
+            <div class="variant-divider"></div><div class="variant-heading"><span>Varianti procedurali</span><span class="variant-badge">SEED</span></div>
+            <label class="setting-label setting-spaced" for="variation">Intensità variazione <output id="variation-value">20%</output></label><input id="variation" type="range" min="0" max="100" value="20" />
+            <label class="setting-label setting-spaced" for="seed">Seed riproducibile</label><div class="seed-row"><input id="seed" type="number" min="0" max="4294967295" value="42" /><button id="random-seed" type="button">⟳ Nuovo seed</button></div>
             <div class="triangle-readout"><span>Triangoli effettivi</span><strong id="triangle-count">—</strong></div><button id="save-variant" class="save-variant-button" type="button">＋ Salva progetto</button>
           </div></details>
-          <div class="generation-actions"><button class="create-button" id="generate" type="button"><span class="button-sparkle" aria-hidden="true">✳</span> Genera modello <span class="button-arrow" aria-hidden="true">→</span></button><button class="alternative-button" id="generate-alternative" type="button">⟳ Genera un’alternativa</button></div>
+          <div class="generation-actions"><button class="create-button" id="generate" type="button">✳ Genera modello →</button><button class="alternative-button" id="generate-alternative" type="button">⟳ Genera un’alternativa</button></div>
         </aside>
         <section class="preview-column" aria-label="Anteprima ed esportazione del modello">
-          <div class="preview-card"><div class="preview-toolbar"><div class="preview-title"><span class="step-label">02 — ANTEPRIMA</span><span class="model-name" id="model-name">Modello 3D</span></div><div class="preview-actions"><button id="screenshot" type="button">Salva immagine</button></div></div><div class="viewport-wrap" id="viewport"></div><div class="preview-footer"><span id="status-text">Modello pronto</span><span id="loading" hidden>Elaborazione…</span></div></div>
-          <div class="export-card"><div class="export-copy"><span class="step-label">03 — PORTA CON TE</span><h2>Esporta il modello</h2><p>Scarica il modello generato nei formati GLB o STL.</p></div><div class="export-actions"><button id="export-glb" type="button">Esporta GLB</button><button id="export-stl" type="button">Esporta STL</button></div></div>
+          <div class="preview-card"><div class="preview-toolbar"><div class="preview-title"><span class="step-label">02 — ANTEPRIMA</span><span class="model-name" id="model-name">Modello 3D</span></div><button id="screenshot" type="button">Salva immagine</button></div><div class="viewport-wrap" id="viewport"></div><div class="preview-footer"><span id="status-text">Modello pronto</span><span id="loading" hidden>Elaborazione…</span></div></div>
+          <div class="export-card"><div class="export-copy"><span class="step-label">03 — ESPORTA</span><h2>Esporta il modello</h2><p>Scarica il modello in formato GLB o STL.</p></div><div class="export-actions"><button id="export-glb" type="button">Esporta GLB</button><button id="export-stl" type="button">Esporta STL</button></div></div>
         </section>
       </div>
-      <section class="projects-section" id="projects-section" aria-labelledby="projects-title"><div class="projects-heading"><div><span class="step-label">LA TUA LIBRERIA</span><h2 id="projects-title">I miei progetti salvati</h2><p>Le configurazioni sono salvate solo su questo dispositivo.</p></div><span class="projects-count" id="projects-count">Progetti salvati</span></div><div class="projects-grid" id="saved-variants"></div></section>
-      <section class="how-it-works" id="come-funziona"><span class="step-label">PROCEDURALE, TRASPARENTE</span><p><strong>Varianti generate localmente, senza AI.</strong> Forme e texture vengono costruite direttamente nel browser.</p></section>
+      <section class="projects-section" id="projects-section" aria-labelledby="projects-title"><div class="projects-heading"><div><span class="step-label">LA TUA LIBRERIA</span><h2 id="projects-title">I miei progetti salvati</h2><p>Disponibili su questo dispositivo e, accedendo, sincronizzati nel cloud.</p></div><span class="projects-count" id="projects-count">0 progetti</span></div><div class="projects-grid" id="saved-variants"></div></section>
+      <section class="how-it-works" id="come-funziona"><span class="step-label">PROCEDURALE, TRASPARENTE</span><p><strong>Generazione locale.</strong> Le geometrie vengono costruite nel browser; il cloud conserva solo configurazioni e miniature dei progetti.</p></section>
       <footer class="site-footer"><span>FORMA<span class="brand-dot">.</span> <span>© 2026</span></span><span>Progettato per creare, pronto da esplorare.</span></footer>
     </main>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -53,5 +53,7 @@
   <script type="module" src="/src/prompt-suggestions.js"></script>
   <script type="module" src="/src/main.js"></script>
   <script type="module" src="/src/project-enhancements.js"></script>
+  <script type="module" src="/src/feature-pack.js"></script>
+  <script type="module" src="/src/cloud-sync.js"></script>
 </body>
 </html>
