@@ -4,6 +4,8 @@ import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { createShapeGroup, detectShape, promptColor, promptDimensions, SHAPE_CATEGORIES, SHAPE_NAMES } from './shape-library.js';
 import { applyMeshOptions, triangleCount } from './model-options.js';
+import { createCatGroup } from './prompt-objects.js';
+import { createProceduralTexture, semanticBaseColor, textureStyleFromPrompt } from './procedural-textures.js';
 import './style.css';
 import './options.css';
 
@@ -29,6 +31,10 @@ for (const category of SHAPE_CATEGORIES) {
   }
   shapeSelect.appendChild(optgroup);
 }
+const catOption = document.createElement('option'); catOption.value = 'cat'; catOption.textContent = 'Gatto (procedurale)';
+let objectCategory = shapeSelect.querySelector('optgroup[label="Oggetti composti"]');
+if (!objectCategory) { objectCategory = document.createElement('optgroup'); objectCategory.label = 'Oggetti composti'; shapeSelect.appendChild(objectCategory); }
+objectCategory.appendChild(catOption);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#15171b');
@@ -59,67 +65,74 @@ function currentConfig() {
     variation: Number(settings.variation.value), seed: normalizeSeed(settings.seed.value),
   };
 }
-function normalizeSeed(value) {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? Math.max(0, Math.min(4294967295, Math.floor(numeric))) : 42;
-}
+function normalizeSeed(value) { const numeric = Number(value); return Number.isFinite(numeric) ? Math.max(0, Math.min(4294967295, Math.floor(numeric))) : 42; }
 function seededRandom(seed) {
   let state = seed >>> 0;
   return () => { state += 0x6D2B79F5; let t = state; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 }
 function applyProceduralVariation(root, seed, amount) {
   if (!amount) return;
-  const random = seededRandom(seed);
-  const strength = amount / 100;
-  const meshes = [];
+  const random = seededRandom(seed); const strength = amount / 100; const meshes = [];
   root.traverse((object) => { if (object.isMesh) meshes.push(object); });
   for (const mesh of meshes) {
-    // Deterministic, bounded part-level variation keeps object recipes recognizable.
-    const scaleSpread = 1 + strength * 0.34;
-    mesh.scale.x *= 1 + (random() * 2 - 1) * (scaleSpread - 1);
-    mesh.scale.y *= 1 + (random() * 2 - 1) * (scaleSpread - 1);
-    mesh.scale.z *= 1 + (random() * 2 - 1) * (scaleSpread - 1);
+    const scaleSpread = strength * 0.34;
+    mesh.scale.x *= 1 + (random() * 2 - 1) * scaleSpread;
+    mesh.scale.y *= 1 + (random() * 2 - 1) * scaleSpread;
+    mesh.scale.z *= 1 + (random() * 2 - 1) * scaleSpread;
     const positionSpread = strength * 0.035;
     mesh.position.x += (random() * 2 - 1) * positionSpread;
     mesh.position.y += (random() * 2 - 1) * positionSpread;
     mesh.position.z += (random() * 2 - 1) * positionSpread;
-    if (meshes.length > 1 && strength > 0.65) {
-      const angle = (random() * 2 - 1) * strength * 0.055;
-      mesh.rotation.y += angle;
-    }
+    if (meshes.length > 1 && strength > 0.65) mesh.rotation.y += (random() * 2 - 1) * strength * 0.055;
   }
 }
 function disposeObject(object) {
+  const geometries = new Set(); const materials = new Set(); const textures = new Set();
   object.traverse((child) => {
     if (!child.isMesh) return;
-    child.geometry.dispose();
-    if (Array.isArray(child.material)) child.material.forEach((material) => material.dispose()); else child.material.dispose();
+    geometries.add(child.geometry);
+    for (const material of (Array.isArray(child.material) ? child.material : [child.material])) {
+      materials.add(material);
+      for (const value of Object.values(material)) if (value?.isTexture) textures.add(value);
+    }
   });
-}
-function readOptions() {
-  return { polygonBudget: Number(settings.polygonBudget.value), roughness: Number(settings.roughness.value), smoothShading: settings.smooth.checked, wireframe: settings.wireframe.checked };
+  geometries.forEach((geometry) => geometry.dispose()); textures.forEach((texture) => texture.dispose()); materials.forEach((material) => material.dispose());
 }
 function makeModel({ notify = true } = {}) {
   const config = currentConfig();
   const text = config.prompt.trim();
-  const shape = config.shape === 'auto' ? detectShape(text) : config.shape;
+  const isCat = config.shape === 'cat' || (config.shape === 'auto' && /\b(gatto|gatta|micio|felino|cat)\b/i.test(text));
+  const shape = config.shape === 'auto' ? (isCat ? 'cat' : detectShape(text)) : config.shape;
   const size = promptDimensions(text, config.dimensions);
-  const detectedColor = promptColor(text);
-  if (detectedColor) { colorInput.value = detectedColor; config.color = detectedColor; }
+  const explicitColor = promptColor(text);
+  const selectedColor = explicitColor || (isCat ? semanticBaseColor(text, 'cat', config.seed) : semanticBaseColor(text, shape, config.seed));
+  // In auto-color mode choose a semantic palette. Explicit prompt colors take precedence.
+  colorInput.value = explicitColor || selectedColor;
+  config.color = colorInput.value;
   updateColorLabel();
+
+  const textureStyle = textureStyleFromPrompt(text);
   const metallic = /metallico|metallica|metal|acciaio|chrome/i.test(text);
-  const material = new THREE.MeshStandardMaterial({ color: config.color, roughness: config.roughness, metalness: metallic ? 0.72 : 0.06, wireframe: config.wireframe, flatShading: !config.smooth });
-  const nextModel = createShapeGroup(shape, material);
+  const material = new THREE.MeshStandardMaterial({
+    color: config.color, map: createProceduralTexture(textureStyle, config.color, config.seed),
+    roughness: textureStyle === 'metal' ? Math.min(config.roughness, 0.35) : config.roughness,
+    metalness: metallic ? 0.72 : 0.06, wireframe: config.wireframe, flatShading: !config.smooth,
+  });
+  const nextModel = isCat
+    ? createCatGroup(text, config.seed, config.smooth, config.wireframe)
+    : createShapeGroup(shape, material);
+  if (isCat) material.dispose();
   applyProceduralVariation(nextModel, config.seed, config.variation);
-  lastTriangleStats = applyMeshOptions(nextModel, readOptions());
+  lastTriangleStats = applyMeshOptions(nextModel, { polygonBudget: config.polygonBudget, roughness: config.roughness, smoothShading: config.smooth });
   nextModel.scale.set(size.width, size.height, size.depth);
   nextModel.position.y = -1 + size.height / 2;
-  nextModel.name = (text || SHAPE_NAMES[shape] || 'Modello').slice(0, 80);
+  const shapeName = shape === 'cat' ? 'Gatto' : (SHAPE_NAMES[shape] || 'Modello');
+  nextModel.name = (text || shapeName).slice(0, 80);
   if (model) { scene.remove(model); disposeObject(model); }
   model = nextModel; scene.add(model);
   $('#model-name').textContent = model.name;
   updateMeshStats(); statusText.textContent = 'Modello pronto';
-  if (notify) showToast(`${SHAPE_NAMES[shape] || 'Forma'} · seed ${config.seed} · ${lastTriangleStats.actual.toLocaleString('it-IT')} triangoli`);
+  if (notify) showToast(`${shapeName} · palette e texture locali · seed ${config.seed} · ${lastTriangleStats.actual.toLocaleString('it-IT')} triangoli`);
 }
 function updateMeshStats() {
   const count = model ? triangleCount(model) : 0;
@@ -157,45 +170,32 @@ function applyQualityPreset() {
   const preset = presets[settings.quality.value]; if (!preset) return;
   settings.polygonBudget.value = String(preset.budget); settings.roughness.value = String(preset.roughness); makeModel({ notify: false });
 }
-function readSavedVariants() {
-  try { const values = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); return Array.isArray(values) ? values.filter((item) => item && typeof item.prompt === 'string') : []; }
-  catch { return []; }
-}
+function readSavedVariants() { try { const values = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); return Array.isArray(values) ? values.filter((item) => item && typeof item.prompt === 'string') : []; } catch { return []; } }
 function renderSavedVariants() {
-  const container = $('#saved-variants'); container.replaceChildren();
-  const variants = readSavedVariants();
+  const container = $('#saved-variants'); container.replaceChildren(); const variants = readSavedVariants();
   if (!variants.length) { const empty = document.createElement('p'); empty.className = 'saved-empty'; empty.textContent = 'I modelli salvati appariranno qui.'; container.appendChild(empty); return; }
   variants.forEach((item, index) => {
     const row = document.createElement('div'); row.className = 'saved-variant-row';
-    const load = document.createElement('button'); load.type = 'button'; load.className = 'saved-load'; load.textContent = `${item.prompt || SHAPE_NAMES[item.shape] || 'Modello'} · #${item.seed}`; load.title = 'Carica questa configurazione';
-    load.addEventListener('click', () => loadVariant(item));
+    const load = document.createElement('button'); load.type = 'button'; load.className = 'saved-load'; load.textContent = `${item.prompt || SHAPE_NAMES[item.shape] || 'Modello'} · #${item.seed}`; load.title = 'Carica questa configurazione'; load.addEventListener('click', () => loadVariant(item));
     const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'saved-remove'; remove.textContent = '×'; remove.setAttribute('aria-label', 'Elimina modello salvato');
     remove.addEventListener('click', () => { const updated = readSavedVariants(); updated.splice(index, 1); localStorage.setItem(STORAGE_KEY, JSON.stringify(updated)); renderSavedVariants(); });
     row.append(load, remove); container.appendChild(row);
   });
 }
 function saveVariant() {
-  const config = currentConfig();
-  const variants = readSavedVariants();
-  if (variants.length >= 30) return showToast('Hai raggiunto il limite di 30 modelli salvati. Elimina un elemento per salvarne un altro.');
+  const config = currentConfig(); const variants = readSavedVariants();
+  if (variants.length >= 30) return showToast('Limite di 30 modelli salvati raggiunto. Elimina un elemento per salvarne un altro.');
   variants.unshift({ ...config, id: `${Date.now()}-${config.seed}` });
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(variants)); renderSavedVariants(); showToast('Configurazione salvata su questo dispositivo'); }
-  catch { showToast('Spazio locale non disponibile: impossibile salvare.'); }
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(variants)); renderSavedVariants(); showToast('Configurazione salvata su questo dispositivo'); } catch { showToast('Spazio locale non disponibile: impossibile salvare.'); }
 }
 function loadVariant(item) {
   promptInput.value = item.prompt || ''; shapeSelect.value = item.shape || 'auto';
   if (item.dimensions) for (const [key, input] of Object.entries(dimensions)) input.value = String(item.dimensions[key] ?? 2);
-  colorInput.value = item.color || '#9b87f5'; settings.polygonBudget.value = String(item.polygonBudget || 8000);
-  settings.quality.value = item.quality || 'custom'; settings.roughness.value = String(item.roughness ?? 0.48);
-  settings.smooth.checked = item.smooth !== false; settings.wireframe.checked = Boolean(item.wireframe);
-  settings.variation.value = String(item.variation ?? 20); settings.seed.value = String(normalizeSeed(item.seed));
+  colorInput.value = item.color || '#9b87f5'; settings.polygonBudget.value = String(item.polygonBudget || 8000); settings.quality.value = item.quality || 'custom'; settings.roughness.value = String(item.roughness ?? 0.48);
+  settings.smooth.checked = item.smooth !== false; settings.wireframe.checked = Boolean(item.wireframe); settings.variation.value = String(item.variation ?? 20); settings.seed.value = String(normalizeSeed(item.seed));
   updateRangeOutputs(); updateColorLabel(); makeModel();
 }
-function randomizeSeed() {
-  const value = new Uint32Array(1);
-  if (globalThis.crypto?.getRandomValues) crypto.getRandomValues(value); else value[0] = Math.floor(Math.random() * 4294967296);
-  settings.seed.value = String(value[0]); makeModel();
-}
+function randomizeSeed() { const value = new Uint32Array(1); if (globalThis.crypto?.getRandomValues) crypto.getRandomValues(value); else value[0] = Math.floor(Math.random() * 4294967296); settings.seed.value = String(value[0]); makeModel(); }
 
 $('#generate').addEventListener('click', () => makeModel());
 $('#reset-dimensions').addEventListener('click', () => { dimensions.width.value = '2'; dimensions.height.value = '2'; dimensions.depth.value = '2'; updateRangeOutputs(); makeModel(); });
@@ -204,17 +204,12 @@ colorInput.addEventListener('input', () => { updateColorLabel(); if (model) make
 shapeSelect.addEventListener('change', () => makeModel());
 promptInput.addEventListener('keydown', (event) => { if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') makeModel(); });
 settings.quality.addEventListener('change', applyQualityPreset);
-settings.polygonBudget.addEventListener('input', () => { settings.quality.value = 'custom'; updateMeshStats(); });
-settings.roughness.addEventListener('input', () => { settings.quality.value = 'custom'; updateMeshStats(); });
-settings.polygonBudget.addEventListener('change', () => makeModel({ notify: false }));
-settings.roughness.addEventListener('change', () => makeModel({ notify: false }));
-settings.smooth.addEventListener('change', () => makeModel({ notify: false }));
-settings.wireframe.addEventListener('change', () => makeModel({ notify: false }));
-settings.variation.addEventListener('input', updateMeshStats);
-settings.variation.addEventListener('change', () => makeModel({ notify: false }));
+settings.polygonBudget.addEventListener('input', () => { settings.quality.value = 'custom'; updateMeshStats(); }); settings.roughness.addEventListener('input', () => { settings.quality.value = 'custom'; updateMeshStats(); });
+settings.polygonBudget.addEventListener('change', () => makeModel({ notify: false })); settings.roughness.addEventListener('change', () => makeModel({ notify: false }));
+settings.smooth.addEventListener('change', () => makeModel({ notify: false })); settings.wireframe.addEventListener('change', () => makeModel({ notify: false }));
+settings.variation.addEventListener('input', updateMeshStats); settings.variation.addEventListener('change', () => makeModel({ notify: false }));
 settings.seed.addEventListener('change', () => { settings.seed.value = String(normalizeSeed(settings.seed.value)); makeModel({ notify: false }); });
-$('#random-seed').addEventListener('click', randomizeSeed);
-$('#save-variant').addEventListener('click', saveVariant);
+$('#random-seed').addEventListener('click', randomizeSeed); $('#save-variant').addEventListener('click', saveVariant);
 $('#export-glb').addEventListener('click', exportGLB); $('#export-stl').addEventListener('click', exportSTL);
 $('#screenshot').addEventListener('click', () => renderer.domElement.toBlob((blob) => { if (blob) { downloadBlob(blob, `${safeFilename(model?.name || 'anteprima')}-seed-${normalizeSeed(settings.seed.value)}.png`); showToast('Immagine PNG scaricata'); } else showToast('Impossibile creare l’immagine.'); }, 'image/png'));
 
