@@ -1,6 +1,6 @@
 # Forma — Generatore di modelli 3D
 
-Generatore statico di geometrie procedurali che funziona nel browser senza AI e senza API esterne. Include una libreria di primitive, forme speciali e oggetti composti; il prompt seleziona forme e attributi codificati. Non interpreta oggetti arbitrari fuori dalla libreria.
+Generatore statico di geometrie procedurali eseguito nel browser, senza AI o API esterne. Prompt e libreria selezionano ricette di forme definite nel codice; varianti deterministiche esplorano combinazioni parametriche delle parti esistenti. Non crea arbitrariamente qualsiasi oggetto descritto.
 
 ## Avvio in locale
 
@@ -31,8 +31,13 @@ Collega il repository a Cloudflare Pages e imposta:
 
 Non servono funzioni server, chiavi o variabili d'ambiente.
 
-## Parametri mesh
+## Varianti e modelli salvati
 
-Il pannello **Parametri avanzati** è facoltativo e include preset qualità, budget polycount manuale (100–50.000 triangoli), rugosità, ombreggiatura liscia e wireframe. Modificare le opzioni ricostruisce il modello; GLB e STL esportano la mesh corrente.
+Nel pannello facoltativo **Parametri avanzati** trovi:
 
-Il polycount è un obiettivo massimo approssimativo, non un conteggio garantito: la semplificazione preserva la geometria e può fermarsi prima del budget, specialmente per mesh composte. Il contatore mostra i triangoli attuali. Le impostazioni non assicurano mesh manifold, pareti cave o idoneità alla stampa: controlla il file in un software di slicing prima di stampare.
+- **Seed riproducibile**: lo stesso prompt, forma e seed genera la stessa variante. Usa **Nuovo seed** per crearne una diversa.
+- **Intensità variazione**: varia in modo deterministico, entro limiti controllati, scala e posizione delle parti della ricetta.
+- **Salva nei miei modelli**: conserva fino a 30 configurazioni in `localStorage` del browser; puoi ricaricarle o eliminarle. I dati restano sul dispositivo/browser in cui sono stati salvati.
+- Preset qualità, polycount manuale (100–50.000 triangoli), rugosità, smoothing e wireframe. GLB e STL esportano la mesh corrente.
+
+La variazione non aggiunge semantica o parti che non siano già definite nella geometria della forma. Il polycount è un budget approssimativo; il conteggio effettivo è mostrato nell'interfaccia. I file STL vanno verificati in un software di slicing prima della stampa: l'app non certifica manifold, spessore pareti o tolleranze.
