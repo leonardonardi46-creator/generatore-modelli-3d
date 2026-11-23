@@ -4,7 +4,15 @@ const $ = (selector) => document.querySelector(selector);
 const PROJECTS_KEY = 'forma-saved-variants-v1';
 const GALLERY_KEY = 'forma-variant-gallery-v1';
 const CONFIG = import.meta.env || {};
-const SUPABASE_URL = String(CONFIG.VITE_SUPABASE_URL || '').trim().replace(/\/+$/, '');
+function normalizeProjectUrl(value) {
+  const url = new URL(String(value || '').trim());
+  if (!['https:', 'http:'].includes(url.protocol)) throw new Error('L’URL Supabase deve iniziare con https://.');
+  url.pathname = url.pathname.replace(/\/(?:rest|auth)\/v1\/?$/i, '').replace(/\/+$/, '');
+  url.search = '';
+  url.hash = '';
+  return url.origin + url.pathname;
+}
+const RAW_SUPABASE_URL = String(CONFIG.VITE_SUPABASE_URL || '').trim();
 const SUPABASE_ANON_KEY = String(CONFIG.VITE_SUPABASE_ANON_KEY || '').trim();
 const badge = $('#account-identity');
 const shell = document.createElement('section');
@@ -55,9 +63,7 @@ function mergeItems(local, remote) {
   for (const [index, item] of [...remote, ...local].entries()) {
     const key = itemKey(item, index);
     const previous = merged.get(key);
-    if (!previous || Number(item.updatedAt || item.createdAt || 0) >= Number(previous.updatedAt || previous.createdAt || 0)) {
-      merged.set(key, { ...item, id: item.id || key });
-    }
+    if (!previous || Number(item.updatedAt || item.createdAt || 0) >= Number(previous.updatedAt || previous.createdAt || 0)) merged.set(key, { ...item, id: item.id || key });
   }
   return [...merged.values()].sort((a, b) => Number(b.updatedAt || b.createdAt || 0) - Number(a.updatedAt || a.createdAt || 0));
 }
@@ -70,22 +76,18 @@ function setupUI() {
   heading.append(copy, state);
   const message = el('p', { id: 'cloud-message', className: 'cloud-message', role: 'status', 'aria-live': 'polite' });
   shell.append(heading, message);
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  let projectUrl = '';
+  try { projectUrl = normalizeProjectUrl(RAW_SUPABASE_URL); }
+  catch (error) {
     shell.classList.add('cloud-unconfigured');
-    message.textContent = 'Configurazione Supabase mancante. Controlla VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY su Cloudflare e poi avvia un nuovo deploy.';
-    $('#projects-section')?.insertAdjacentElement('beforebegin', shell);
-    return null;
-  }
-  let parsedUrl;
-  try { parsedUrl = new URL(SUPABASE_URL); }
-  catch {
-    message.textContent = 'VITE_SUPABASE_URL non è un URL valido. Inserisci l’URL base del progetto, per esempio https://<project-ref>.supabase.co.';
+    message.textContent = RAW_SUPABASE_URL ? `Configurazione URL Supabase non valida: ${error.message}` : 'Configurazione Supabase mancante. Controlla VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY nelle variabili di build Cloudflare.';
     message.dataset.kind = 'error';
     $('#projects-section')?.insertAdjacentElement('beforebegin', shell);
     return null;
   }
-  if (!['https:', 'http:'].includes(parsedUrl.protocol) || (parsedUrl.pathname !== '/' && parsedUrl.pathname !== '')) {
-    message.textContent = 'URL Supabase non valido: usa solo l’URL base del progetto senza /rest/v1, /auth/v1 o altri percorsi.';
+  if (!SUPABASE_ANON_KEY) {
+    shell.classList.add('cloud-unconfigured');
+    message.textContent = 'Chiave Supabase mancante: controlla VITE_SUPABASE_ANON_KEY nelle variabili di build Cloudflare.';
     message.dataset.kind = 'error';
     $('#projects-section')?.insertAdjacentElement('beforebegin', shell);
     return null;
@@ -94,7 +96,7 @@ function setupUI() {
   const emailLabel = el('label', { htmlFor: 'cloud-email' }, 'Email');
   const email = el('input', { id: 'cloud-email', type: 'email', autocomplete: 'email', required: 'required', placeholder: 'nome@esempio.it' });
   const passwordLabel = el('label', { htmlFor: 'cloud-password' }, 'Password');
-  const password = el('input', { id: 'cloud-password', type: 'password', autocomplete: 'current-password', required: 'required', minlength: '8', placeholder: 'Almeno 8 caratteri' });
+  const password = el('input', { id: 'cloud-password', type: 'password', autocomplete: 'current-password', required: 'required', minlength: '6', placeholder: 'Almeno 6 caratteri' });
   const actions = el('div', { className: 'cloud-actions' });
   const signIn = el('button', { type: 'submit', id: 'cloud-sign-in', className: 'cloud-primary' }, 'Accedi');
   const signUp = el('button', { type: 'button', id: 'cloud-sign-up' }, 'Crea account');
@@ -106,24 +108,21 @@ function setupUI() {
   account.append(accountLabel, signOut);
   shell.append(form, account);
   $('#projects-section')?.insertAdjacentElement('beforebegin', shell);
-  return { form, email, password, signIn, signUp, account, accountLabel, signOut };
+  return { form, email, password, signIn, signUp, account, accountLabel, signOut, projectUrl };
 }
 
 const ui = setupUI();
 const cloudStyle = el('style');
 cloudStyle.textContent = `
-.cloud-account{margin:28px 0;padding:22px;border:1px solid #34313c;border-radius:10px;background:#17161c;color:#eeeaf5}.cloud-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.cloud-heading h2{margin:6px 0;font:700 20px Manrope,sans-serif}.cloud-heading p{margin:0;color:#a6a2af;font-size:13px}.cloud-state{padding:7px 10px;border:1px solid #494451;border-radius:20px;color:#c5bfce;font-size:12px;white-space:nowrap}.cloud-state[data-online="true"]{border-color:#4d806a;color:#c1e6d0}.cloud-message{min-height:1.4em;margin:12px 0;color:#c4bfd0;font-size:13px}.cloud-message[data-kind="error"]{color:#ffb5bd}.cloud-message[data-kind="success"]{color:#a7e0bd}#cloud-auth-form{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;max-width:680px}#cloud-auth-form label{grid-column:span 2;color:#d7d2df;font-size:12px}#cloud-auth-form input{grid-column:span 2;padding:10px 12px;border:1px solid #393640;border-radius:7px;background:#111115;color:#f5f2f8}#cloud-auth-form button,#cloud-signed-in button{padding:9px 14px;border:1px solid #494451;border-radius:7px;background:#211f27;color:#eeeaf5;cursor:pointer}.cloud-actions{grid-column:span 2;display:flex;gap:9px;margin-top:5px}.cloud-actions .cloud-primary{border-color:#9b87f5;background:#8069e8;color:white}#cloud-signed-in{align-items:center;gap:12px;color:#dcd7e4;font-size:13px}#cloud-signed-in:not([hidden]){display:flex}.cloud-unconfigured{background:#151519}.account-identity{display:inline-flex;align-items:center;gap:7px;max-width:min(36vw,300px);padding:7px 11px;border:1px solid #494451;border-radius:20px;background:#1a191f;color:#e8e4f0;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.account-identity::before{content:'';width:7px;height:7px;flex:none;border-radius:50%;background:#9993a4}.account-identity[data-authenticated="true"]{border-color:#4d806a;color:#d3f0df}.account-identity[data-authenticated="true"]::before{background:#75d39b;box-shadow:0 0 8px #75d39b70}@media(max-width:600px){.cloud-account{padding:16px}.cloud-heading{flex-direction:column}.cloud-state{white-space:normal}#cloud-auth-form{grid-template-columns:1fr}#cloud-auth-form label,#cloud-auth-form input,.cloud-actions{grid-column:1}.account-identity{max-width:42vw;padding:6px 8px;font-size:11px}}
+.cloud-account{margin:28px 0;padding:22px;border:1px solid #34313c;border-radius:10px;background:#17161c;color:#eeeaf5}.cloud-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.cloud-heading h2{margin:6px 0;font:700 20px Manrope,sans-serif}.cloud-heading p{margin:0;color:#a6a2af;font-size:13px}.cloud-state{padding:7px 10px;border:1px solid #494451;border-radius:20px;color:#c5bfce;font-size:12px;white-space:nowrap}.cloud-state[data-online="true"]{border-color:#4d806a;color:#c1e6d0}.cloud-message{min-height:1.4em;margin:12px 0;color:#c4bfd0;font-size:13px;overflow-wrap:anywhere}.cloud-message[data-kind="error"]{color:#ffb5bd}.cloud-message[data-kind="success"]{color:#a7e0bd}#cloud-auth-form{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;max-width:680px}#cloud-auth-form label{grid-column:span 2;color:#d7d2df;font-size:12px}#cloud-auth-form input{grid-column:span 2;min-width:0;padding:10px 12px;border:1px solid #393640;border-radius:7px;background:#111115;color:#f5f2f8}#cloud-auth-form button,#cloud-signed-in button{padding:9px 14px;border:1px solid #494451;border-radius:7px;background:#211f27;color:#eeeaf5;cursor:pointer}.cloud-actions{grid-column:span 2;display:flex;flex-wrap:wrap;gap:9px;margin-top:5px}.cloud-actions .cloud-primary{border-color:#9b87f5;background:#8069e8;color:white}#cloud-signed-in{align-items:center;gap:12px;color:#dcd7e4;font-size:13px}#cloud-signed-in:not([hidden]){display:flex}.cloud-unconfigured{background:#151519}.account-identity{display:inline-flex;align-items:center;gap:7px;max-width:min(36vw,300px);padding:7px 11px;border:1px solid #494451;border-radius:20px;background:#1a191f;color:#e8e4f0;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.account-identity::before{content:'';width:7px;height:7px;flex:none;border-radius:50%;background:#9993a4}.account-identity[data-authenticated="true"]{border-color:#4d806a;color:#d3f0df}.account-identity[data-authenticated="true"]::before{background:#75d39b;box-shadow:0 0 8px #75d39b70}@media(max-width:600px){.cloud-account{padding:16px}.cloud-heading{flex-direction:column}.cloud-state{white-space:normal}#cloud-auth-form{grid-template-columns:1fr}#cloud-auth-form label,#cloud-auth-form input,.cloud-actions{grid-column:1}.account-identity{max-width:42vw;padding:6px 8px;font-size:11px}}
 `;
 document.head.append(cloudStyle);
 
 if (ui) {
-  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+  const supabase = createClient(ui.projectUrl, SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
   let currentUser = null;
   let syncing = false;
-  let lastLocalFingerprint = '';
-  let lastRemoteUpdatedAt = '';
   let pollTimer = null;
-
   async function getWorkspace() {
     const { data, error } = await supabase.from('user_workspaces').select('projects, variants, updated_at').eq('user_id', currentUser.id).maybeSingle();
     if (error) throw error;
@@ -133,29 +132,16 @@ if (ui) {
     const updatedAt = new Date().toISOString();
     const { error } = await supabase.from('user_workspaces').upsert({ user_id: currentUser.id, projects, variants, updated_at: updatedAt }, { onConflict: 'user_id' });
     if (error) throw error;
-    lastRemoteUpdatedAt = updatedAt;
   }
-  async function synchronize({ initial = false } = {}) {
+  async function synchronize() {
     if (!currentUser || syncing) return;
     syncing = true;
     try {
-      let localProjects = readArray(PROJECTS_KEY);
-      let localVariants = readArray(GALLERY_KEY);
-      const localBefore = fingerprint(localProjects, localVariants);
-      const remote = await getWorkspace();
-      if (initial) {
-        localProjects = mergeItems(localProjects, remote?.projects || []);
-        localVariants = mergeItems(localVariants, remote?.variants || []);
-      } else {
-        localProjects = mergeItems(localProjects, remote?.projects || []);
-        localVariants = mergeItems(localVariants, remote?.variants || []);
-      }
-      writeArray(PROJECTS_KEY, localProjects);
-      writeArray(GALLERY_KEY, localVariants);
-      const mergedFingerprint = fingerprint(localProjects, localVariants);
-      if (!remote || mergedFingerprint !== fingerprint(remote.projects || [], remote.variants || [])) await saveWorkspace(localProjects, localVariants);
-      else lastRemoteUpdatedAt = remote.updated_at || '';
-      lastLocalFingerprint = mergedFingerprint;
+      const projects = mergeItems(readArray(PROJECTS_KEY), (await getWorkspace())?.projects || []);
+      const variants = mergeItems(readArray(GALLERY_KEY), (await getWorkspace())?.variants || []);
+      writeArray(PROJECTS_KEY, projects);
+      writeArray(GALLERY_KEY, variants);
+      await saveWorkspace(projects, variants);
       showMessage('Progetti e varianti sincronizzati.', 'success');
       document.dispatchEvent(new CustomEvent('forma:cloud-synced'));
     } catch (error) {
@@ -166,22 +152,18 @@ if (ui) {
     currentUser = session?.user || null;
     const email = currentUser?.email || '';
     updateIdentity(email);
-    $('#cloud-auth-form').hidden = Boolean(currentUser);
-    $('#cloud-signed-in').hidden = !currentUser;
-    $('#cloud-user-email').textContent = email;
+    ui.form.hidden = Boolean(currentUser);
+    ui.account.hidden = !currentUser;
+    ui.accountLabel.textContent = email;
     $('#cloud-state').textContent = currentUser ? 'Cloud attivo' : 'Solo su questo dispositivo';
     $('#cloud-state').dataset.online = String(Boolean(currentUser));
     if (pollTimer) clearInterval(pollTimer);
     pollTimer = null;
     if (currentUser) {
-      showMessage('Accesso avvenuto. Caricamento e unione dei progetti locali e cloud…', 'success');
-      synchronize({ initial: true });
-      pollTimer = setInterval(() => synchronize(), 15000);
-    } else {
-      showMessage('Guest: i progetti restano disponibili in locale. Accedi per sincronizzarli.');
-      lastLocalFingerprint = '';
-      lastRemoteUpdatedAt = '';
-    }
+      showMessage(`Accesso avvenuto come ${email}. Sto sincronizzando…`, 'success');
+      synchronize();
+      pollTimer = setInterval(synchronize, 15000);
+    } else showMessage('Guest: i progetti restano disponibili in locale. Accedi per sincronizzarli.');
   }
   ui.form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -191,7 +173,7 @@ if (ui) {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email: ui.email.value.trim(), password: ui.password.value });
       if (error) throw error;
-      if (!data?.session || !data?.user) throw new Error('Supabase non ha restituito una sessione attiva. Controlla se l’email è stata confermata.');
+      if (!data?.session || !data?.user) throw new Error('Nessuna sessione attiva. Se hai appena creato l’account, conferma prima l’email.');
       updateAuthUI(data.session);
       showMessage(`Accesso avvenuto come ${data.user.email}.`, 'success');
     } catch (error) { showMessage(`Accesso non riuscito: ${error.message || 'errore di autenticazione.'}`, 'error'); }
@@ -204,12 +186,13 @@ if (ui) {
     try {
       const { data, error } = await supabase.auth.signUp({ email: ui.email.value.trim(), password: ui.password.value, options: { emailRedirectTo: window.location.origin } });
       if (error) throw error;
-      if (!data?.user) throw new Error('Supabase non ha confermato la creazione dell’account. Riprova.');
+      if (!data?.user) throw new Error('Supabase non ha confermato la creazione dell’account.');
+      if (Array.isArray(data.user.identities) && data.user.identities.length === 0) throw new Error('Esiste già un account con questa email. Prova ad accedere o controlla la posta per confermarlo.');
       if (data.session) {
         updateAuthUI(data.session);
         showMessage(`Registrazione account avvenuta e accesso effettuato come ${data.user.email}.`, 'success');
       } else {
-        showMessage(`Registrazione account avvenuta per ${data.user.email}. Controlla la posta e conferma l’indirizzo prima di accedere.`, 'success');
+        showMessage(`Account creato per ${data.user.email}. Controlla la posta e conferma l’indirizzo; questa risposta è stata inviata da Supabase.`, 'success');
       }
     } catch (error) { showMessage(`Registrazione non riuscita: ${error.message || 'errore di autenticazione.'}`, 'error'); }
     finally { ui.signIn.disabled = false; ui.signUp.disabled = false; }
@@ -219,7 +202,7 @@ if (ui) {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      updateIdentity();
+      updateAuthUI(null);
       showMessage('Disconnessione avvenuta. I dati locali restano su questo dispositivo.', 'success');
     } catch (error) { showMessage(`Disconnessione non riuscita: ${error.message || 'errore.'}`, 'error'); }
     finally { ui.signOut.disabled = false; }
@@ -228,5 +211,5 @@ if (ui) {
   supabase.auth.getSession().then(({ data, error }) => {
     if (error) { updateIdentity(); showMessage(`Impossibile verificare la sessione: ${error.message}`, 'error'); }
     else updateAuthUI(data.session);
-  });
+  }).catch((error) => showMessage(`Errore di configurazione Supabase: ${error.message}`, 'error'));
 }
