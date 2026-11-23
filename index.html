@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#101114" />
+    <meta name="description" content="Crea e personalizza modelli 3D direttamente nel browser, poi esportali in GLB o STL." />
+    <title>Forma — Generatore 3D</title>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="Forma, pagina iniziale">
+          <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="m16 3 12 7v12l-12 7-12-7V10l12-7Z"/><path d="m4.5 10 11.5 7 11.5-7M16 17v12M10 6.5l12 7"/></svg></span>
+          <span>forma<span class="brand-dot">.</span></span>
+        </a>
+        <div class="topbar-right"><span class="local-badge"><i></i> Elaborazione locale</span><a class="top-link" href="#come-funziona">Come funziona <span aria-hidden="true">↗</span></a></div>
+      </header>
+
+      <main class="workspace">
+        <section class="intro" aria-labelledby="page-title">
+          <div class="eyebrow"><span class="eyebrow-line"></span> LABORATORIO 3D</div>
+          <h1 id="page-title">Dai forma alle<br /><span>tue idee.</span></h1>
+          <p>Descrivi un oggetto, scegli le sue proporzioni e crea un modello 3D pronto da esplorare ed esportare.</p>
+        </section>
+
+        <div class="studio-grid">
+          <aside class="panel controls-panel" aria-label="Impostazioni del modello">
+            <div class="panel-heading"><div><span class="step-label">01 — CONFIGURA</span><h2>Il tuo modello</h2></div><span class="heading-icon" aria-hidden="true">✳</span></div>
+            <label class="field-label" for="prompt">Descrizione</label>
+            <textarea id="prompt" rows="3" maxlength="240" placeholder="Es. una sfera liscia, un cono alto...">Un cubo minimalista</textarea>
+            <p class="field-hint">La descrizione seleziona la forma riconosciuta. La geometria viene creata nel browser, senza AI o servizi esterni.</p>
+
+            <div class="field-row shape-row">
+              <label class="field-label" for="shape">Forma</label>
+              <select id="shape">
+                <option value="auto">Rileva dalla descrizione</option>
+                <option value="box">Cubo / parallelepipedo</option>
+                <option value="sphere">Sfera</option>
+                <option value="cylinder">Cilindro</option>
+                <option value="cone">Cono</option>
+                <option value="torus">Toro / ciambella</option>
+              </select>
+            </div>
+
+            <div class="field-row dimensions-heading"><span class="field-label">Dimensioni <span class="unit">unità</span></span><button class="text-button" id="reset-dimensions" type="button">Ripristina</button></div>
+            <div class="dimension-list">
+              <label class="range-row" for="width"><span>Larghezza</span><output id="width-value">2.0</output><input id="width" type="range" min="0.5" max="5" step="0.1" value="2" /></label>
+              <label class="range-row" for="height"><span>Altezza</span><output id="height-value">2.0</output><input id="height" type="range" min="0.5" max="5" step="0.1" value="2" /></label>
+              <label class="range-row" for="depth"><span>Profondità</span><output id="depth-value">2.0</output><input id="depth" type="range" min="0.5" max="5" step="0.1" value="2" /></label>
+            </div>
+
+            <div class="field-row color-row"><label class="field-label" for="color">Colore</label><div class="color-control"><input id="color" type="color" value="#9b87f5" aria-label="Scegli il colore del modello" /><span id="color-value">Lavanda</span></div></div>
+            <button class="create-button" id="generate" type="button"><span class="button-sparkle" aria-hidden="true">✳</span> Genera modello <span class="button-arrow" aria-hidden="true">→</span></button>
+            <p class="privacy-note"><span aria-hidden="true">◇</span> Il modello resta sul tuo dispositivo.</p>
+          </aside>
+
+          <section class="preview-column" aria-label="Anteprima ed esportazione del modello">
+            <div class="preview-card">
+              <div class="preview-toolbar"><div class="preview-title"><span class="step-label">02 — ANTEPRIMA</span><span class="model-name" id="model-name">Cubo minimalista</span></div><span class="live-status"><i></i> <span id="status-text">Pronto</span></span></div>
+              <div class="viewport-wrap" id="viewport-wrap">
+                <div id="viewport" class="viewport" aria-label="Visualizzatore interattivo 3D"></div>
+                <div class="viewport-hint"><span aria-hidden="true">↻</span> Trascina per ruotare <span class="hint-separator">·</span> pizzica per zoomare</div>
+                <div class="viewport-axis" aria-hidden="true"><span>X</span><span>Y</span><span>Z</span></div>
+                <div class="loading-overlay" id="loading" hidden><span class="spinner"></span><span>Preparazione scena…</span></div>
+              </div>
+              <div class="preview-footer"><span><span class="footer-dot"></span> Anteprima interattiva</span><button id="screenshot" class="icon-button" type="button" title="Scarica un'immagine PNG" aria-label="Scarica un'immagine PNG"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6.5h3l1.2-2h5.6l1.2 2h3v9H3v-9Z"/><circle cx="10" cy="10.5" r="3"/></svg></button></div>
+            </div>
+
+            <div class="export-card"><div class="export-copy"><span class="step-label">03 — PORTA CON TE</span><h2>Esporta il modello</h2><p>Scegli il formato adatto al tuo flusso di lavoro.</p></div><div class="export-actions"><button class="export-button" id="export-glb" type="button"><span class="file-icon">3D</span><span><strong>Scarica GLB</strong><small>Scene 3D · web e app</small></span><span class="download-arrow" aria-hidden="true">↓</span></button><button class="export-button" id="export-stl" type="button"><span class="file-icon stl-icon">STL</span><span><strong>Scarica STL</strong><small>Stampa 3D · mesh</small></span><span class="download-arrow" aria-hidden="true">↓</span></button></div></div>
+          </section>
+        </div>
+        <section class="how-it-works" id="come-funziona"><span class="step-label">SEMPLICE E TRASPARENTE</span><p><strong>Forma genera geometrie parametriche reali direttamente nel browser.</strong> Puoi creare cubi, sfere, cilindri, coni e tori, modificarne dimensioni e colore ed esportarli. Non è un generatore AI: non invia prompt a servizi esterni e non richiede chiavi API.</p></section>
+        <footer class="site-footer"><span>FORMA<span class="brand-dot">.</span> <span>© 2026</span></span><span>Progettato per creare, pronto da esplorare.</span></footer>
+      </main>
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
