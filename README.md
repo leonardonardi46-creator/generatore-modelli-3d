@@ -42,3 +42,4 @@ Non servono funzioni server, chiavi o variabili d'ambiente.
 ## Altre opzioni
 
 Il pannello avanzato mantiene polycount manuale, preset qualità, rugosità, smoothing, wireframe, seed riproducibile, intensità delle varianti e fino a 30 configurazioni salvate in locale. GLB e STL esportano la mesh corrente. Il polycount è un budget, non un conteggio garantito; controllare gli STL in uno slicer prima della stampa.
+Build automatico Cloudflare Workers attivato.
